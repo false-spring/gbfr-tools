@@ -39,7 +39,15 @@ struct LanguageFile {
 }
 
 fn main() {
-    let file = File::open("text.msg").expect("text.msg not found");
+    let args = std::env::args().collect::<Vec<String>>();
+
+    if args.len() != 2 {
+        eprintln!("Usage: <file.msg>");
+        std::process::exit(1);
+    }
+
+    let file_path = &args[1];
+    let file = File::open(file_path).expect("file not found");
     let mut reader = BufReader::new(file);
     let msg: LanguageFile = rmp_serde::from_read(&mut reader).expect("Failed to read value");
     let mut csv_writer = csv::Writer::from_path("output.csv").expect("Failed to create CSV writer");

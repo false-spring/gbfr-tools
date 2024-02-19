@@ -18,7 +18,7 @@ fn xxhash32_rotl(x: u32, r: u32) -> u32 {
 
 #[inline(always)]
 fn xxhash32_round(seed: u32, input: u32) -> u32 {
-    xxhash32_rotl(seed + input * PRIME32_2, 13) * PRIME32_1
+    xxhash32_rotl(seed.wrapping_add(input.wrapping_mul(PRIME32_2)), 13).wrapping_mul(PRIME32_1)
 }
 
 pub fn xxhash32_custom(input: &str) -> u32 {
@@ -40,10 +40,10 @@ pub fn xxhash32_custom(input: &str) -> u32 {
             v4 = xxhash32_round(v4, cursor.read_u32::<LittleEndian>().unwrap());
         }
 
-        h32 = xxhash32_rotl(v1, 1)
-            + xxhash32_rotl(v2, 7)
-            + xxhash32_rotl(v3, 12)
-            + xxhash32_rotl(v4, 18);
+        h32 = xxhash32_rotl(v1, 1).wrapping_add(
+            xxhash32_rotl(v2, 7)
+                .wrapping_add(xxhash32_rotl(v3, 12).wrapping_add(xxhash32_rotl(v4, 18))),
+        );
     }
 
     h32 += input.len() as u32;
