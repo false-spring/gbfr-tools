@@ -1,0 +1,6 @@
+[workspace]
+
+members = [
+    "language-unpack",
+		"xxhash32",
+]

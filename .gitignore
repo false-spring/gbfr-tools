@@ -1,0 +1,6 @@
+*.msg
+*.json
+*.tbl
+*.csv
+/target
+/Cargo.lock
