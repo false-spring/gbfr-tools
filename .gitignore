@@ -2,6 +2,7 @@
 *.json
 *.tbl
 *.csv
+*.txt
 en/
 /target
 /Cargo.lock
