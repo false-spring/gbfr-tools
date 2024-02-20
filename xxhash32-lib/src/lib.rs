@@ -21,9 +21,9 @@ fn xxhash32_round(seed: u32, input: u32) -> u32 {
     xxhash32_rotl(seed.wrapping_add(input.wrapping_mul(PRIME32_2)), 13).wrapping_mul(PRIME32_1)
 }
 
-pub fn xxhash32_custom(input: &str) -> u32 {
+pub fn xxhash32_custom(input: &[u8]) -> u32 {
     let buffer_len = input.len() as u32;
-    let mut cursor = Cursor::new(input.as_bytes());
+    let mut cursor = Cursor::new(input);
 
     let mut h32: u32 = 0x178A54A4;
 
@@ -77,7 +77,7 @@ mod tests {
 
     #[test]
     fn hashes_correctly() {
-        assert_eq!(0x887AE0B0, xxhash32_custom(""));
-        assert_eq!(0x9AD6310D, xxhash32_custom("hello"));
+        assert_eq!(0x887AE0B0, xxhash32_custom("".as_bytes()));
+        assert_eq!(0x9AD6310D, xxhash32_custom("hello".as_bytes()));
     }
 }

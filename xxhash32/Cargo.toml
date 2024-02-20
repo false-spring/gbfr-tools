@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 clap = { version = "4.5.1", features = ["derive"] }
 xxhash32-lib = { path = "../xxhash32-lib" }
+libbruteforce = "4.0.1"

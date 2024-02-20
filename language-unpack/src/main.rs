@@ -9,7 +9,7 @@ fn read_all_rows(csv_writer: &mut csv::Writer<File>, msg: LanguageFile) -> Resul
     for row in msg.rows_ {
         let column = row.column_;
         csv_writer.write_record(&[
-            format!("{:#010X}", xxhash32_custom(&column.id_hash_)),
+            format!("{:#010X}", xxhash32_custom(column.id_hash_.as_bytes())),
             column.id_hash_,
             column.subid_hash_,
             column.text_,
