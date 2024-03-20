@@ -2,12 +2,13 @@ use anyhow::Context;
 use clap::{Parser, Subcommand};
 use rusqlite::Connection;
 use serde::Deserialize;
-use serde_json::{Map, Value};
+use serde_json::{json, Map, Value};
 use std::{
     fs::File,
     io::{BufReader, Write},
     path::PathBuf,
 };
+use xxhash32_lib::xxhash32_custom;
 
 #[derive(Debug, Deserialize)]
 struct LanguageRowColumn {
@@ -132,12 +133,69 @@ impl Overmastery {
                         continue;
                     }
 
-                    output.insert(key.to_string(), Value::String(text.to_string()));
+                    output.insert(
+                        key.to_string().to_lowercase(),
+                        json!({
+                            "key": key,
+                            "text": text,
+                        }),
+                    );
                 }
             }
 
             let mut output_file =
                 File::create(format!("data/{}/overmasteries.json", language)).unwrap();
+
+            output_file.write(&serde_json::to_string_pretty(&output)?.as_bytes())?;
+        }
+
+        Ok(())
+    }
+}
+
+struct Weapon;
+
+impl Weapon {
+    pub fn extract(db: &Connection) -> anyhow::Result<()> {
+        let mut statement =
+            db.prepare("SELECT Key, Name FROM weapon WHERE Name IS NOT NULL AND Key IS NOT NULL")?;
+
+        for language in LANGUAGES {
+            let rows = statement.query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+            })?;
+
+            let mut output = Map::new();
+
+            let lang_file_path = format!("text/{}/text.msg", language);
+            let lang_file = LanguageFile::open(&lang_file_path).context(format!(
+                "Could not open language file at path: {}",
+                &lang_file_path
+            ))?;
+            let hashmap = lang_file.to_hashmap();
+
+            for row in rows {
+                let (key, translation_id) = row.unwrap();
+                let text = hashmap.get(&translation_id);
+
+                if let Some(text) = text {
+                    if text.is_empty() {
+                        continue;
+                    }
+
+                    let hash = format!("{:08x}", xxhash32_custom(key.as_bytes()));
+
+                    output.insert(
+                        hash,
+                        json!({
+                            "key": key,
+                            "text": text,
+                        }),
+                    );
+                }
+            }
+
+            let mut output_file = File::create(format!("data/{}/weapons.json", language)).unwrap();
 
             output_file.write(&serde_json::to_string_pretty(&output)?.as_bytes())?;
         }
@@ -184,6 +242,7 @@ fn main() -> anyhow::Result<()> {
 
             Characters::extract()?;
             Overmastery::extract(&db)?;
+            Weapon::extract(&db)?;
         }
     }
 

@@ -27,17 +27,23 @@ pub fn xxhash32_custom(input: &[u8]) -> u32 {
 
     let mut h32: u32 = 0x178A54A4;
 
-    if input.len() > 16 {
+    if input.len() >= 16 {
         let mut v1 = 0x2557311B;
         let mut v2 = 0x871FB76A;
         let mut v3 = 0x0133ECF3;
         let mut v4 = 0x62FC7342;
 
-        while buffer_len - cursor.position() as u32 >= 16 {
+        loop {
             v1 = xxhash32_round(v1, cursor.read_u32::<LittleEndian>().unwrap());
             v2 = xxhash32_round(v2, cursor.read_u32::<LittleEndian>().unwrap());
             v3 = xxhash32_round(v3, cursor.read_u32::<LittleEndian>().unwrap());
             v4 = xxhash32_round(v4, cursor.read_u32::<LittleEndian>().unwrap());
+
+            if buffer_len - cursor.position() as u32 > 16 {
+                continue;
+            } else {
+                break;
+            }
         }
 
         h32 = xxhash32_rotl(v1, 1).wrapping_add(
@@ -79,5 +85,6 @@ mod tests {
     fn hashes_correctly() {
         assert_eq!(0x887AE0B0, xxhash32_custom("".as_bytes()));
         assert_eq!(0x9AD6310D, xxhash32_custom("hello".as_bytes()));
+        assert_eq!(0x48110BA3, xxhash32_custom("WEP_PL1500_04_03".as_bytes()));
     }
 }
