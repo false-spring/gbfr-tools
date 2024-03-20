@@ -358,6 +358,45 @@ impl Items {
     }
 }
 
+struct Quests;
+
+impl Quests {
+    fn extract() -> anyhow::Result<()> {
+        for language in LANGUAGES {
+            let mut output = Map::new();
+            let lang_file_path = format!("text/{}/text_stage.msg", language);
+            let language_file = LanguageFile::open(&lang_file_path).context(format!(
+                "Could not open language file at path: {}",
+                &lang_file_path
+            ))?;
+
+            for row in &language_file.rows_ {
+                if !row.column_.id_hash_.starts_with("TXT_QR") {
+                    continue;
+                }
+
+                let quest_id = row.column_.id_hash_.split("_").nth(2);
+
+                if let Some(quest_id) = quest_id {
+                    output.insert(
+                        quest_id.to_string(),
+                        json!({
+                            "key": row.column_.id_hash_,
+                            "text": row.column_.text_,
+                        }),
+                    );
+                }
+            }
+
+            let mut output_file = File::create(format!("data/{}/quests.json", language)).unwrap();
+
+            output_file.write(&serde_json::to_string_pretty(&output)?.as_bytes())?;
+        }
+
+        Ok(())
+    }
+}
+
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
 struct Cli {
@@ -400,6 +439,7 @@ fn main() -> anyhow::Result<()> {
             Sigils::extract(&db)?;
             Traits::extract(&db)?;
             Items::extract(&db)?;
+            Quests::extract()?;
         }
     }
 
