@@ -397,6 +397,74 @@ impl Quests {
     }
 }
 
+struct Enemies;
+
+impl Enemies {
+    fn extract(db: &Connection) -> anyhow::Result<()> {
+        let mut statement = db.prepare(
+            "SELECT KeyMaybe, Unk3 FROM enemy WHERE KeyMaybe IS NOT NULL AND Unk3 IS NOT NULL",
+        )?;
+
+        for language in LANGUAGES {
+            let rows = statement.query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+            })?;
+
+            let mut output = Map::new();
+
+            let lang_file_path = format!("text/{}/text_chara.msg", language);
+            let lang_file = LanguageFile::open(&lang_file_path).context(format!(
+                "Could not open language file at path: {}",
+                &lang_file_path
+            ))?;
+
+            let hashmap = lang_file.to_hashmap();
+
+            for row in rows {
+                let (key, translation_id) = row.unwrap();
+                let text = hashmap.get(&translation_id);
+
+                if let Some(text) = text {
+                    if text.is_empty() {
+                        continue;
+                    }
+
+                    // Convert enemy name to titlecase, EM7700 -> Em7700
+                    let mut enemy_name = key.clone();
+
+                    enemy_name = enemy_name
+                        .chars()
+                        .enumerate()
+                        .map(|(i, c)| {
+                            if i == 0 || !c.is_ascii_alphanumeric() {
+                                c.to_ascii_uppercase()
+                            } else {
+                                c.to_ascii_lowercase()
+                            }
+                        })
+                        .collect();
+
+                    let hash = format!("{:08x}", xxhash32_custom(enemy_name.as_bytes()));
+
+                    output.insert(
+                        hash,
+                        json!({
+                            "key": key,
+                            "text": text,
+                        }),
+                    );
+                }
+            }
+
+            let mut output_file = File::create(format!("data/{}/enemies.json", language)).unwrap();
+
+            output_file.write(&serde_json::to_string_pretty(&output)?.as_bytes())?;
+        }
+
+        Ok(())
+    }
+}
+
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
 struct Cli {
@@ -440,6 +508,7 @@ fn main() -> anyhow::Result<()> {
             Traits::extract(&db)?;
             Items::extract(&db)?;
             Quests::extract()?;
+            Enemies::extract(&db)?;
         }
     }
 
