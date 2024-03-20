@@ -204,6 +204,160 @@ impl Weapon {
     }
 }
 
+struct Sigils;
+
+impl Sigils {
+    fn extract(db: &Connection) -> anyhow::Result<()> {
+        let mut statement =
+            db.prepare("SELECT Key, Name FROM gem WHERE Name IS NOT NULL AND Key IS NOT NULL")?;
+
+        for language in LANGUAGES {
+            let rows = statement.query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+            })?;
+
+            let mut output = Map::new();
+
+            let lang_file_path = format!("text/{}/text.msg", language);
+            let lang_file = LanguageFile::open(&lang_file_path).context(format!(
+                "Could not open language file at path: {}",
+                &lang_file_path
+            ))?;
+            let hashmap = lang_file.to_hashmap();
+
+            for row in rows {
+                let (key, translation_id) = row.unwrap();
+                let text = hashmap.get(&translation_id);
+
+                if let Some(text) = text {
+                    if text.is_empty() {
+                        continue;
+                    }
+
+                    let hash = format!("{:08x}", xxhash32_custom(key.as_bytes()));
+
+                    output.insert(
+                        hash,
+                        json!({
+                            "key": key,
+                            "text": text,
+                        }),
+                    );
+                }
+            }
+
+            let mut output_file = File::create(format!("data/{}/sigils.json", language)).unwrap();
+
+            output_file.write(&serde_json::to_string_pretty(&output)?.as_bytes())?;
+        }
+
+        Ok(())
+    }
+}
+
+struct Traits;
+
+impl Traits {
+    fn extract(db: &Connection) -> anyhow::Result<()> {
+        let mut statement =
+            db.prepare("SELECT Key, Name FROM skill WHERE Name IS NOT NULL AND Key IS NOT NULL")?;
+
+        for language in LANGUAGES {
+            let rows = statement.query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+            })?;
+
+            let mut output = Map::new();
+
+            let lang_file_path = format!("text/{}/text.msg", language);
+            let lang_file = LanguageFile::open(&lang_file_path).context(format!(
+                "Could not open language file at path: {}",
+                &lang_file_path
+            ))?;
+            let hashmap = lang_file.to_hashmap();
+
+            for row in rows {
+                let (key, translation_id) = row.unwrap();
+                let text = hashmap.get(&translation_id);
+
+                if let Some(text) = text {
+                    if text.is_empty() {
+                        continue;
+                    }
+
+                    let hash = format!("{:08x}", xxhash32_custom(key.as_bytes()));
+
+                    output.insert(
+                        hash,
+                        json!({
+                            "key": key,
+                            "text": text,
+                        }),
+                    );
+                }
+            }
+
+            let mut output_file = File::create(format!("data/{}/traits.json", language)).unwrap();
+
+            output_file.write(&serde_json::to_string_pretty(&output)?.as_bytes())?;
+        }
+
+        Ok(())
+    }
+}
+
+struct Items;
+
+impl Items {
+    fn extract(db: &Connection) -> anyhow::Result<()> {
+        let mut statement = db.prepare(
+            "SELECT Key, ItemName FROM item WHERE ItemName IS NOT NULL AND Key IS NOT NULL",
+        )?;
+
+        for language in LANGUAGES {
+            let rows = statement.query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+            })?;
+
+            let mut output = Map::new();
+
+            let lang_file_path = format!("text/{}/text.msg", language);
+            let lang_file = LanguageFile::open(&lang_file_path).context(format!(
+                "Could not open language file at path: {}",
+                &lang_file_path
+            ))?;
+            let hashmap = lang_file.to_hashmap();
+
+            for row in rows {
+                let (key, translation_id) = row.unwrap();
+                let text = hashmap.get(&translation_id);
+
+                if let Some(text) = text {
+                    if text.is_empty() {
+                        continue;
+                    }
+
+                    let hash = format!("{:08x}", xxhash32_custom(key.as_bytes()));
+
+                    output.insert(
+                        hash,
+                        json!({
+                            "key": key,
+                            "text": text,
+                        }),
+                    );
+                }
+            }
+
+            let mut output_file = File::create(format!("data/{}/items.json", language)).unwrap();
+
+            output_file.write(&serde_json::to_string_pretty(&output)?.as_bytes())?;
+        }
+
+        Ok(())
+    }
+}
+
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
 struct Cli {
@@ -243,6 +397,9 @@ fn main() -> anyhow::Result<()> {
             Characters::extract()?;
             Overmastery::extract(&db)?;
             Weapon::extract(&db)?;
+            Sigils::extract(&db)?;
+            Traits::extract(&db)?;
+            Items::extract(&db)?;
         }
     }
 
