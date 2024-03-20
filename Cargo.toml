@@ -2,6 +2,7 @@
 resolver = "2"
 
 members = [
-    "language-unpack", "xxhash32",
-		"xxhash32-lib",
+    "language-unpack",
+    "xxhash32",
+    "xxhash32-lib",
 ]

@@ -1,30 +1,17 @@
+use anyhow::Context;
+use clap::{Parser, Subcommand};
+use rusqlite::Connection;
 use serde::Deserialize;
-use std::{fs::File, io::BufReader};
-
-use xxhash32_lib::xxhash32_custom;
-
-fn read_all_rows(csv_writer: &mut csv::Writer<File>, msg: LanguageFile) -> Result<(), csv::Error> {
-    csv_writer.write_record(["id", "id_hash_", "sub_id_hash_", "text_"])?;
-
-    for row in msg.rows_ {
-        let column = row.column_;
-        csv_writer.write_record(&[
-            format!("{:#010X}", xxhash32_custom(column.id_hash_.as_bytes())),
-            column.id_hash_,
-            column.subid_hash_,
-            column.text_,
-        ])?;
-    }
-
-    csv_writer.flush()?;
-
-    Ok(())
-}
+use serde_json::{Map, Value};
+use std::{
+    fs::File,
+    io::{BufReader, Write},
+    path::PathBuf,
+};
 
 #[derive(Debug, Deserialize)]
 struct LanguageRowColumn {
     id_hash_: String,
-    subid_hash_: String,
     text_: String,
 }
 
@@ -38,19 +25,167 @@ struct LanguageFile {
     rows_: Vec<LanguageRow>,
 }
 
-fn main() {
-    let args = std::env::args().collect::<Vec<String>>();
-
-    if args.len() != 2 {
-        eprintln!("Usage: <file.msg>");
-        std::process::exit(1);
+impl LanguageFile {
+    pub fn open(file_path: &str) -> anyhow::Result<Self> {
+        let file = File::open(file_path)?;
+        let mut reader = BufReader::new(file);
+        let lang_file = rmp_serde::from_read(&mut reader)?;
+        Ok(lang_file)
     }
 
-    let file_path = &args[1];
-    let file = File::open(file_path).expect("file not found");
-    let mut reader = BufReader::new(file);
-    let msg: LanguageFile = rmp_serde::from_read(&mut reader).expect("Failed to read value");
-    let mut csv_writer = csv::Writer::from_path("output.csv").expect("Failed to create CSV writer");
+    pub fn to_hashmap(&self) -> std::collections::HashMap<String, String> {
+        let mut hashmap = std::collections::HashMap::new();
 
-    read_all_rows(&mut csv_writer, msg).unwrap();
+        for row in &self.rows_ {
+            hashmap.insert(row.column_.id_hash_.clone(), row.column_.text_.clone());
+        }
+
+        hashmap
+    }
+}
+
+const LANGUAGES: [&str; 10] = ["bp", "cs", "ct", "en", "es", "fr", "ge", "it", "jp", "ko"];
+
+struct Characters;
+
+impl Characters {
+    pub fn extract() -> anyhow::Result<()> {
+        let characters = [
+            ("Pl0000", "TXT_PL0000"),
+            ("Pl0100", "TXT_PL0100"),
+            ("Pl0200", "TXT_PL0200"),
+            ("Pl0300", "TXT_PL0300"),
+            ("Pl0400", "TXT_PL0400"),
+            ("Pl0500", "TXT_PL0500"),
+            ("Pl0600", "TXT_PL0600"),
+            ("Pl0700", "TXT_PL0700"),
+            ("Pl0800", "TXT_PL0800"),
+            ("Pl0900", "TXT_PL0900"),
+            ("Pl1000", "TXT_PL1000"),
+            ("Pl1100", "TXT_PL1100"),
+            ("Pl1200", "TXT_PL1200"),
+            ("Pl1300", "TXT_PL1300"),
+            ("Pl1400", "TXT_PL1400"),
+            ("Pl1500", "TXT_PL1500"),
+            ("Pl1600", "TXT_PL1600"),
+            ("Pl1700", "TXT_PL1700"),
+            ("Pl1800", "TXT_PL1800"),
+            ("Pl1900", "TXT_PL1900"),
+            ("Pl2000", "TXT_PL2000"),
+            ("Pl2100", "TXT_PL2100"),
+            ("Pl2200", "TXT_PL2200"),
+            ("Pl2300", "TXT_PL2300"),
+            ("Pl2400", "TXT_PL2400"),
+        ];
+
+        for language in LANGUAGES {
+            let mut output = Map::new();
+            let lang_file_path = format!("text/{}/text_chara.msg", language);
+            let language_file = LanguageFile::open(&lang_file_path).context(format!(
+                "Could not open language file at path: {}",
+                &lang_file_path
+            ))?;
+            let hashmap = language_file.to_hashmap();
+
+            for (id, key) in characters {
+                let default = String::new();
+                let text = hashmap.get(key).unwrap_or(&default);
+                output.insert(id.to_string(), Value::String(text.to_string()));
+            }
+
+            let mut output_file =
+                File::create(format!("data/{}/characters.json", language)).unwrap();
+
+            output_file.write(&serde_json::to_string_pretty(&output)?.as_bytes())?;
+        }
+
+        Ok(())
+    }
+}
+
+struct Overmastery;
+
+impl Overmastery {
+    fn extract(db: &Connection) -> anyhow::Result<()> {
+        let mut statement =
+            db.prepare("SELECT Key, Unk16 FROM limit_bonus_param WHERE Unk16 IS NOT NULL")?;
+
+        for language in LANGUAGES {
+            let rows = statement.query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+            })?;
+
+            let mut output = Map::new();
+            let lang_file_path = format!("text/{}/text_limit_bonus.msg", language);
+            let lang_file = LanguageFile::open(&lang_file_path).context(format!(
+                "Could not open language file at path: {}",
+                &lang_file_path
+            ))?;
+            let hashmap = lang_file.to_hashmap();
+
+            for row in rows {
+                let (key, translation_id) = row.unwrap();
+                let text = hashmap.get(&translation_id);
+
+                if let Some(text) = text {
+                    if text.is_empty() {
+                        continue;
+                    }
+
+                    output.insert(key.to_string(), Value::String(text.to_string()));
+                }
+            }
+
+            let mut output_file =
+                File::create(format!("data/{}/overmasteries.json", language)).unwrap();
+
+            output_file.write(&serde_json::to_string_pretty(&output)?.as_bytes())?;
+        }
+
+        Ok(())
+    }
+}
+
+#[derive(Parser)]
+#[command(version, about, long_about = None)]
+struct Cli {
+    #[command(subcommand)]
+    command: Commands,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    Print { file: PathBuf },
+    ExtractAll {},
+}
+
+fn main() -> anyhow::Result<()> {
+    let args = Cli::parse();
+
+    match &args.command {
+        Commands::Print { file } => {
+            let language_file = LanguageFile::open(file.to_str().unwrap())?;
+
+            for row in language_file.rows_ {
+                println!("{:?}", row);
+            }
+        }
+        Commands::ExtractAll {} => {
+            let default_path = "system_table.sqlite";
+            let db = Connection::open(&default_path).context(format!(
+                "Could not open sqlite db at path: {}",
+                &default_path
+            ))?;
+
+            // Create output data directory if it doesn't exist.
+            for langauge in LANGUAGES {
+                std::fs::create_dir_all(format!("data/{}", langauge)).unwrap();
+            }
+
+            Characters::extract()?;
+            Overmastery::extract(&db)?;
+        }
+    }
+
+    Ok(())
 }

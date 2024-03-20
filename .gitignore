@@ -3,6 +3,8 @@
 *.tbl
 *.csv
 *.txt
-en/
+*.sqlite
+text/
+data/
 /target
 /Cargo.lock
