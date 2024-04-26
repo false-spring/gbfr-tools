@@ -402,7 +402,7 @@ struct Enemies;
 impl Enemies {
     fn extract(db: &Connection) -> anyhow::Result<()> {
         let mut statement = db.prepare(
-            "SELECT KeyMaybe, Unk3 FROM enemy WHERE KeyMaybe IS NOT NULL AND Unk3 IS NOT NULL",
+            "SELECT KeyMaybe, VariantName1 FROM enemy WHERE KeyMaybe IS NOT NULL AND VariantName1 IS NOT NULL",
         )?;
 
         for language in LANGUAGES {
