@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use anyhow::Context;
 use clap::{Parser, Subcommand};
 use rusqlite::Connection;
@@ -34,8 +36,8 @@ impl LanguageFile {
         Ok(lang_file)
     }
 
-    pub fn to_hashmap(&self) -> std::collections::HashMap<String, String> {
-        let mut hashmap = std::collections::HashMap::new();
+    pub fn to_hashmap(&self) -> HashMap<String, String> {
+        let mut hashmap = HashMap::new();
 
         for row in &self.rows_ {
             hashmap.insert(row.column_.id_hash_.clone(), row.column_.text_.clone());
@@ -43,6 +45,31 @@ impl LanguageFile {
 
         hashmap
     }
+
+    pub fn to_hashed_hashmap(&self) -> HashMap<u32, String> {
+        let mut hashmap = HashMap::new();
+
+        for row in &self.rows_ {
+            let hash = xxhash32_custom(row.column_.id_hash_.as_bytes());
+            hashmap.insert(hash, row.column_.text_.clone());
+        }
+
+        hashmap
+    }
+}
+
+fn get_value(
+    key: &str,
+    hashmap: &HashMap<String, String>,
+    x32_hashmap: &HashMap<u32, String>,
+) -> Option<String> {
+    let hashed_version = u32::from_str_radix(key, 16)
+        .ok()
+        .and_then(|hashed| x32_hashmap.get(&hashed));
+
+    let decoded_version = hashmap.get(key);
+
+    hashed_version.or(decoded_version).cloned()
 }
 
 const LANGUAGES: [&str; 10] = ["bp", "cs", "ct", "en", "es", "fr", "ge", "it", "jp", "ko"];
@@ -122,11 +149,13 @@ impl Overmastery {
                 "Could not open language file at path: {}",
                 &lang_file_path
             ))?;
+
             let hashmap = lang_file.to_hashmap();
+            let x32_hashmap = lang_file.to_hashed_hashmap();
 
             for row in rows {
                 let (key, translation_id) = row.unwrap();
-                let text = hashmap.get(&translation_id);
+                let text = get_value(&translation_id, &hashmap, &x32_hashmap);
 
                 if let Some(text) = text {
                     if text.is_empty() {
@@ -172,11 +201,13 @@ impl Weapon {
                 "Could not open language file at path: {}",
                 &lang_file_path
             ))?;
+
             let hashmap = lang_file.to_hashmap();
+            let x32_hashmap = lang_file.to_hashed_hashmap();
 
             for row in rows {
                 let (key, translation_id) = row.unwrap();
-                let text = hashmap.get(&translation_id);
+                let text = get_value(&translation_id, &hashmap, &x32_hashmap);
 
                 if let Some(text) = text {
                     if text.is_empty() {
@@ -223,11 +254,13 @@ impl Sigils {
                 "Could not open language file at path: {}",
                 &lang_file_path
             ))?;
+
             let hashmap = lang_file.to_hashmap();
+            let x32_hashmap = lang_file.to_hashed_hashmap();
 
             for row in rows {
                 let (key, translation_id) = row.unwrap();
-                let text = hashmap.get(&translation_id);
+                let text = get_value(&translation_id, &hashmap, &x32_hashmap);
 
                 if let Some(text) = text {
                     if text.is_empty() {
@@ -274,11 +307,13 @@ impl Traits {
                 "Could not open language file at path: {}",
                 &lang_file_path
             ))?;
+
             let hashmap = lang_file.to_hashmap();
+            let x32_hashmap = lang_file.to_hashed_hashmap();
 
             for row in rows {
                 let (key, translation_id) = row.unwrap();
-                let text = hashmap.get(&translation_id);
+                let text = get_value(&translation_id, &hashmap, &x32_hashmap);
 
                 if let Some(text) = text {
                     if text.is_empty() {
@@ -326,11 +361,13 @@ impl Items {
                 "Could not open language file at path: {}",
                 &lang_file_path
             ))?;
+
             let hashmap = lang_file.to_hashmap();
+            let x32_hashmap = lang_file.to_hashed_hashmap();
 
             for row in rows {
                 let (key, translation_id) = row.unwrap();
-                let text = hashmap.get(&translation_id);
+                let text = get_value(&translation_id, &hashmap, &x32_hashmap);
 
                 if let Some(text) = text {
                     if text.is_empty() {
@@ -419,10 +456,11 @@ impl Enemies {
             ))?;
 
             let hashmap = lang_file.to_hashmap();
+            let x32_hashmap = lang_file.to_hashed_hashmap();
 
             for row in rows {
                 let (key, translation_id) = row.unwrap();
-                let text = hashmap.get(&translation_id);
+                let text = get_value(&translation_id, &hashmap, &x32_hashmap);
 
                 if let Some(text) = text {
                     if text.is_empty() {
