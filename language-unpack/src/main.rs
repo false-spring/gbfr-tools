@@ -136,7 +136,7 @@ struct Overmastery;
 impl Overmastery {
     fn extract(db: &Connection) -> anyhow::Result<()> {
         let mut statement =
-            db.prepare("SELECT Key, Unk16 FROM limit_bonus_param WHERE Unk16 IS NOT NULL")?;
+            db.prepare("SELECT Key, FullName FROM limit_bonus_param WHERE FullName IS NOT NULL")?;
 
         for language in LANGUAGES {
             let rows = statement.query_map([], |row| {
@@ -162,8 +162,16 @@ impl Overmastery {
                         continue;
                     }
 
+                    let hash;
+
+                    if key.to_string().to_lowercase().contains("_eff_") {
+                        hash = format!("{:08x}", xxhash32_custom(key.as_bytes()));
+                    } else {
+                        hash = key.to_string().to_lowercase()
+                    }
+
                     output.insert(
-                        key.to_string().to_lowercase(),
+                        hash,
                         json!({
                             "key": key,
                             "text": text,
