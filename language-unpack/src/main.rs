@@ -162,8 +162,16 @@ impl Overmastery {
                         continue;
                     }
 
+                    let hash;
+
+                    if key.to_string().to_lowercase().contains("_eff_") {
+                        hash = format!("{:08x}", xxhash32_custom(key.as_bytes()));
+                    } else {
+                        hash = key.to_string().to_lowercase()
+                    }
+
                     output.insert(
-                        key.to_string().to_lowercase(),
+                        hash,
                         json!({
                             "key": key,
                             "text": text,
