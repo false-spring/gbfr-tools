@@ -72,6 +72,16 @@ fn get_value(
     hashed_version.or(decoded_version).cloned()
 }
 
+fn hash_key_if_not_hashed(key: &str) -> String {
+    let hashed_version = u32::from_str_radix(key, 16).ok();
+
+    if hashed_version.is_none() {
+        format!("{:08x}", xxhash32_custom(key.as_bytes()))
+    } else {
+        key.to_string()
+    }
+}
+
 const LANGUAGES: [&str; 10] = ["bp", "cs", "ct", "en", "es", "fr", "ge", "it", "jp", "ko"];
 
 struct Characters;
@@ -162,8 +172,10 @@ impl Overmastery {
                         continue;
                     }
 
+                    let hashed_key = hash_key_if_not_hashed(&key);
+
                     output.insert(
-                        key.to_string().to_lowercase(),
+                        hashed_key.to_lowercase(),
                         json!({
                             "key": key,
                             "text": text,
